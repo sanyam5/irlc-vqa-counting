@@ -1,0 +1,3 @@
+USE_CUDA=True
+VOCAB_SIZE = 20158
+DATA_DIR = "./data"
