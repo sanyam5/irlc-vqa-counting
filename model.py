@@ -211,28 +211,38 @@ class IRLC(nn.Module):
         self.extra_params = nn.ParameterList([self.eps])
         self.EMA = 0
 
-    def sample_action(self, weights, already_selected=None, greedy=False):
-        # weights = (B, num classes)
+    def sample_action(self, probs, already_selected=None, greedy=False):
+        # probs = (B, k+1)
         # already_selected = (num_timesteps, B)
 
         if already_selected is None:
             mask = 1
         else:
-            mask = Variable(torch.ones(weights.size()))
+            mask = Variable(torch.ones(probs.size()))
             if USE_CUDA:
                 # TODO: uncomment this, when this model works
                 mask = mask.cuda()
                 pass
-            mask = mask.scatter_(1, already_selected.t(), 0)
+            mask = mask.scatter_(1, already_selected.t(), 0)  # (B, k+1)
 
-        masked_weights = mask * (weights + 1e-12)  # (B, k+1), add epsilon to make sure no non-masked value is zero.
+        masked_probs = mask * (probs + 1e-20)  # (B, k+1), add epsilon to make sure no non-masked value is zero.
+        rescaled_masked_probs = masked_probs / (1e-20 + masked_probs.sum(dim=1)[:, None])
+
+        # print("masked probs = ", masked_probs)
+        # print("masked_prbs sum = ", masked_probs.sum(dim=1))
+        #
+        # print("rescaled masked probs = ", rescaled_masked_probs[0])
+        # print("rescaled masked_prbs sum = ", rescaled_masked_probs.sum(dim=1))
+        #
+        # if torch.randn(1)[0] > 1:
+        #     raise Exception("hoopla")
 
         if greedy:
-            _, a = masked_weights.max(dim=1)  # (B)
+            _, a = rescaled_masked_probs.max(dim=1)  # (B)
         else:
-            a = masked_weights.multinomial(num_samples=1).squeeze(dim=1)  # (B)
+            a = rescaled_masked_probs.multinomial(num_samples=1).squeeze(dim=1)  # (B)
 
-        return a
+        return a, rescaled_masked_probs
 
     @staticmethod
     def get_interaction(rho, a):
@@ -268,16 +278,16 @@ class IRLC(nn.Module):
 
         for t in range(T):
             # calculate probabilities of each action
-            p = F.softmax(torch.cat((kappa, batch_eps), dim=1), dim=1)  # (B, k+1)
+            unscaled_p = F.softmax(torch.cat((kappa, batch_eps), dim=1), dim=1)  # (B, k+1)
             # print("p = ", p)
             # select one object (called "action" in RL terms), avoid already selected objects.
-            a = self.sample_action(weights=p, already_selected=A, greedy=greedy)  # (B)
+            a, scaled_p = self.sample_action(probs=unscaled_p, already_selected=A, greedy=greedy)  # (B)
             # update kappa logits with the row in the interaction matrix corresponding to the chosen action.
             interaction = self.get_interaction(rho, a)
             kappa = kappa + interaction
 
             # record the prob and action values at each timestep for later use
-            P = p[None] if P is None else torch.cat((P, p[None]), dim=0)  # (t+1, B, k+1)
+            P = scaled_p[None] if P is None else torch.cat((P, scaled_p[None]), dim=0)  # (t+1, B, k+1)
             A = a[None] if A is None else torch.cat((A, a[None]), dim=0)  # (t+1, B)
 
         assert P.size() == (T, B, k+1)
@@ -357,7 +367,7 @@ class IRLC(nn.Module):
         PA = P.gather(dim=2, index=A.unsqueeze(2)).squeeze(dim=2)  # (T, B)
         assert PA.size() == A.size()
 
-        log_PA = torch.log(PA + 1e-12)  # (T, B)
+        log_PA = torch.log(PA + 1e-20)  # (T, B)
         # sum_log_PA = log_PA.sum(dim=0)  # (B,)
 
         mean_log_PA = (log_PA * valid_A).sum(dim=0) / valid_A.sum(dim=0)
@@ -375,7 +385,7 @@ class IRLC(nn.Module):
 
         # P entropy loss
         def H(probs, dim):
-            mults = probs * torch.log(probs + 1e-12)
+            mults = probs * torch.log(probs + 1e-20)
             return - mults.sum(dim=dim)
 
         h = H(P, dim=2)  # (T, B)
