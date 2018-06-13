@@ -50,9 +50,9 @@ class FCNet(nn.Module):
             in_dim = dims[i]
             out_dim = dims[i+1]
             layers.append(weight_norm(nn.Linear(in_dim, out_dim), dim=None))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU())
         layers.append(weight_norm(nn.Linear(dims[-2], dims[-1]), dim=None))
-        layers.append(nn.ReLU())
+        layers.append(nn.LeakyReLU())
 
         self.main = nn.Sequential(*layers)
 
@@ -433,6 +433,6 @@ class IRLC(nn.Module):
         entropy_loss = self.get_entropy_loss(P, A)
         interaction_strength = self.get_interaction_strength(rho)
 
-        loss = 1.0 * sc_loss  # + .005 * entropy_loss # + .005 * interaction_strength
+        loss = 1.0 * sc_loss + .005 * entropy_loss + .005 * interaction_strength
 
         return loss
