@@ -114,7 +114,8 @@ class RhoScorer(nn.Module):
         self.W = weight_norm(nn.Linear(QuestionParser.ques_dim, 1), dim=None)
 
         inp_dim = 1 + 1 + 6 + 6 + 1 + 1 + 1  # 17
-        self.f_rho = FCNet([inp_dim, 100, 1])
+        self.f_rho = FCNet([inp_dim, 100])
+        self.dense = weight_norm(nn.Linear(100, 1), dim=None)
 
     @staticmethod
     def get_spatials(b):
@@ -192,7 +193,8 @@ class RhoScorer(nn.Module):
 
         features = torch.cat(features, dim=3)  # (B, k, k, 17)
 
-        rho = self.f_rho(features).squeeze(3)  # (B, k, k)
+        rho = self.f_rho(features)  # (B, k, k, 100)
+        rho = self.dense(rho).squeeze(3)  # (B, k, k)
 
         return rho, features  # (B, k, k)
 
@@ -433,6 +435,6 @@ class IRLC(nn.Module):
         entropy_loss = self.get_entropy_loss(P, A)
         interaction_strength = self.get_interaction_strength(rho)
 
-        loss = 1.0 * sc_loss + .005 * entropy_loss + .005 * interaction_strength
+        loss = 1.0 * sc_loss # + .005 * entropy_loss + .005 * interaction_strength
 
         return loss
