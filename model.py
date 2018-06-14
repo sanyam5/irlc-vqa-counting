@@ -93,12 +93,14 @@ class GTUScoringFunction(nn.Module):
     q_dim = QuestionParser.ques_dim
     score_dim = 2048
 
-    def __init__(self, dropout=0.1):
+    def __init__(self, dropout=0.3):
         super(GTUScoringFunction, self).__init__()
-        self.dense1 = nn.Linear(self.v_dim + self.q_dim, self.score_dim)
-        self.dense2 = nn.Linear(self.v_dim + self.q_dim, self.score_dim)
 
-        self.dropout = nn.Dropout(dropout)
+        self.predrop = nn.Dropout(dropout)
+        self.dense1 = weight_norm(nn.Linear(self.v_dim + self.q_dim, self.score_dim), dim=None)
+        self.dense2 = weight_norm(nn.Linear(self.v_dim + self.q_dim, self.score_dim), dim=None)
+
+        self.dropout = nn.Dropout(dropout + 0.2)
 
     def forward(self, v, q):
         """
@@ -109,6 +111,8 @@ class GTUScoringFunction(nn.Module):
 
         q = q[:, None, :].repeat(1, k, 1)  # (B, k, q_dim)
         vq = torch.cat([v, q], dim=2)  # (B, k, v_dim + q_dim)
+
+        vq = self.predrop(vq)
 
         y = F.tanh(self.dense1(vq))  # (B, k, score_dim)
         g = F.sigmoid(self.dense2(vq))  # (B, k, score_dim)
@@ -234,7 +238,7 @@ class IRLC(nn.Module):
     def __init__(self):
         super(IRLC, self).__init__()
         self.ques_parser = QuestionParser()
-        self.f_s = ScoringFunction()
+        self.f_s = GTUScoringFunction()
         self.W = weight_norm(nn.Linear(self.f_s.score_dim, 1), dim=None)
         self.f_rho = RhoScorer()
 
