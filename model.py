@@ -13,10 +13,10 @@ class QuestionParser(nn.Module):
     ques_dim = 1024
     glove_file = DATA_DIR + "/glove6b_init_300d.npy"
 
-    def __init__(self, dropout=0.1):
+    def __init__(self, dropout=0.3):
         super(QuestionParser, self).__init__()
         self.embd = nn.Embedding(VOCAB_SIZE + 1, self.word_dim, padding_idx=VOCAB_SIZE)
-        self.rnn = nn.LSTM(self.word_dim, self.ques_dim)
+        self.rnn = nn.GRU(self.word_dim, self.ques_dim)
         self.dropout = nn.Dropout(dropout)
         self.glove_init()
 
@@ -32,7 +32,7 @@ class QuestionParser(nn.Module):
         # print("question size ", questions.size())
         questions = questions.t()  # (MAXLEN, B)
         questions = self.embd(questions)  # (MAXLEN, B, word_size)
-        _, (q_emb, _) = self.rnn(questions)
+        _, (q_emb) = self.rnn(questions)
         q_emb = q_emb[-1]  # (B, ques_size)
         q_emb = self.dropout(q_emb)
 
@@ -63,9 +63,9 @@ class FCNet(nn.Module):
 class ScoringFunction(nn.Module):
     v_dim = 2048
     q_dim = QuestionParser.ques_dim
-    score_dim = 2048
+    score_dim = 1024
 
-    def __init__(self, dropout=0.1):
+    def __init__(self, dropout=0.3):
         super(ScoringFunction, self).__init__()
         self.v_drop = nn.Dropout(dropout)
         self.q_drop = nn.Dropout(dropout)
@@ -234,7 +234,7 @@ class IRLC(nn.Module):
     def __init__(self):
         super(IRLC, self).__init__()
         self.ques_parser = QuestionParser()
-        self.f_s = GTUScoringFunction()
+        self.f_s = ScoringFunction()
         self.W = weight_norm(nn.Linear(self.f_s.score_dim, 1), dim=None)
         self.f_rho = RhoScorer()
 
@@ -259,15 +259,6 @@ class IRLC(nn.Module):
 
         masked_probs = mask * (probs + 1e-20)  # (B, k+1), add epsilon to make sure no non-masked value is zero.
         rescaled_masked_probs = masked_probs / (1e-20 + masked_probs.sum(dim=1)[:, None])
-
-        # print("masked probs = ", masked_probs)
-        # print("masked_prbs sum = ", masked_probs.sum(dim=1))
-        #
-        # print("rescaled masked probs = ", rescaled_masked_probs[0])
-        # print("rescaled masked_prbs sum = ", rescaled_masked_probs.sum(dim=1))
-        #
-        # if torch.randn(1)[0] > 1:
-        #     raise Exception("hoopla")
 
         if greedy:
             _, a = rescaled_masked_probs.max(dim=1)  # (B)
@@ -465,6 +456,6 @@ class IRLC(nn.Module):
         entropy_loss = self.get_entropy_loss(P, A)
         interaction_strength = self.get_interaction_strength(rho)
 
-        loss = 1.0 * sc_loss # + .005 * entropy_loss + .005 * interaction_strength
+        loss = 1.0 * sc_loss + .005 * entropy_loss + .005 * interaction_strength
 
         return loss
