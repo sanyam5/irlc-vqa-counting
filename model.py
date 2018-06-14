@@ -16,7 +16,7 @@ class QuestionParser(nn.Module):
     def __init__(self, dropout=0.1):
         super(QuestionParser, self).__init__()
         self.embd = nn.Embedding(VOCAB_SIZE + 1, self.word_dim, padding_idx=VOCAB_SIZE)
-        self.rnn = nn.GRU(self.word_dim, self.ques_dim)
+        self.rnn = nn.LSTM(self.word_dim, self.ques_dim)
         self.dropout = nn.Dropout(dropout)
         self.glove_init()
 
@@ -32,7 +32,7 @@ class QuestionParser(nn.Module):
         # print("question size ", questions.size())
         questions = questions.t()  # (MAXLEN, B)
         questions = self.embd(questions)  # (MAXLEN, B, word_size)
-        _, q_emb = self.rnn(questions)
+        _, (q_emb, _) = self.rnn(questions)
         q_emb = q_emb[-1]  # (B, ques_size)
         q_emb = self.dropout(q_emb)
 
@@ -84,6 +84,36 @@ class ScoringFunction(nn.Module):
         v_proj = self.v_proj(v)  # [batch, k, qdim]
         q_proj = self.q_proj(q).unsqueeze(1).repeat(1, k, 1)  # [batch, k, qdim]
         s = v_proj * q_proj
+        s = self.dropout(s)
+        return s  # (B, k, score_dim)
+
+
+class GTUScoringFunction(nn.Module):
+    v_dim = 2048
+    q_dim = QuestionParser.ques_dim
+    score_dim = 2048
+
+    def __init__(self, dropout=0.1):
+        super(GTUScoringFunction, self).__init__()
+        self.dense1 = nn.Linear(self.v_dim + self.q_dim, self.score_dim)
+        self.dense2 = nn.Linear(self.v_dim + self.q_dim, self.score_dim)
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, v, q):
+        """
+        v: [batch, k, vdim]
+        q: [batch, qdim]
+        """
+        batch, k, _ = v.size()
+
+        q = q[:, None, :].repeat(1, k, 1)  # (B, k, q_dim)
+        vq = torch.cat([v, q], dim=2)  # (B, k, v_dim + q_dim)
+
+        y = F.tanh(self.dense1(vq))  # (B, k, score_dim)
+        g = F.sigmoid(self.dense2(vq))  # (B, k, score_dim)
+
+        s = y * g
         s = self.dropout(s)
         return s  # (B, k, score_dim)
 
@@ -204,7 +234,7 @@ class IRLC(nn.Module):
     def __init__(self):
         super(IRLC, self).__init__()
         self.ques_parser = QuestionParser()
-        self.f_s = ScoringFunction()
+        self.f_s = GTUScoringFunction()
         self.W = weight_norm(nn.Linear(self.f_s.score_dim, 1), dim=None)
         self.f_rho = RhoScorer()
 
