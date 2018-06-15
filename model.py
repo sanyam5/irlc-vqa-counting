@@ -6,6 +6,7 @@ from config import *
 from torch.nn.utils.weight_norm import weight_norm
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.distributions.categorical import Categorical
 
 
 class QuestionParser(nn.Module):
@@ -238,7 +239,7 @@ class IRLC(nn.Module):
     def __init__(self):
         super(IRLC, self).__init__()
         self.ques_parser = QuestionParser()
-        self.f_s = GTUScoringFunction()
+        self.f_s = ScoringFunction()
         self.W = weight_norm(nn.Linear(self.f_s.score_dim, 1), dim=None)
         self.f_rho = RhoScorer()
 
@@ -262,14 +263,16 @@ class IRLC(nn.Module):
             mask = mask.scatter_(1, already_selected.t(), 0)  # (B, k+1)
 
         masked_probs = mask * (probs + 1e-20)  # (B, k+1), add epsilon to make sure no non-masked value is zero.
-        rescaled_masked_probs = masked_probs / (1e-20 + masked_probs.sum(dim=1)[:, None])
+        dist = Categorical(probs=masked_probs)
 
         if greedy:
-            _, a = rescaled_masked_probs.max(dim=1)  # (B)
+            _, a = masked_probs.max(dim=1)  # (B)
         else:
-            a = rescaled_masked_probs.multinomial(num_samples=1).squeeze(dim=1)  # (B)
+            a = dist.sample()  # (B)
 
-        return a, rescaled_masked_probs
+        log_prob = dist.log_prob(a)  # (B)
+        entropy = dist.entropy()  # (B)
+        return a, log_prob, entropy
 
     @staticmethod
     def get_interaction(rho, a):
@@ -298,7 +301,8 @@ class IRLC(nn.Module):
 
         B, k = kappa_0.size()
 
-        P = None  # will store probability values at each timestep.
+        logPA = None  # log prob values for each time-step.
+        entP = None  # distribution entropy value for each timestep.
         A = None  # will store action values at each timestep.
         T = k+1  # num timesteps = different possible actions. +1 for the terminal action
         kappa = kappa_0  # (B, k), starting kappa
@@ -308,23 +312,26 @@ class IRLC(nn.Module):
             unscaled_p = F.softmax(torch.cat((kappa, batch_eps), dim=1), dim=1)  # (B, k+1)
             # print("p = ", p)
             # select one object (called "action" in RL terms), avoid already selected objects.
-            a, scaled_p = self.sample_action(probs=unscaled_p, already_selected=A, greedy=greedy)  # (B)
+            a, log_prob, entropy = self.sample_action(
+                probs=unscaled_p, already_selected=A, greedy=greedy)  # (B,), (B,), (B,)
             # update kappa logits with the row in the interaction matrix corresponding to the chosen action.
             interaction = self.get_interaction(rho, a)
             kappa = kappa + interaction
 
             # record the prob and action values at each timestep for later use
-            P = scaled_p[None] if P is None else torch.cat((P, scaled_p[None]), dim=0)  # (t+1, B, k+1)
+            logPA = log_prob[None] if logPA is None else torch.cat((logPA, log_prob[None]), dim=0)  # (t+1, B)
+            entP = entropy[None] if entP is None else torch.cat((entP, log_prob[None]), dim=0)  # (t+1, B)
             A = a[None] if A is None else torch.cat((A, a[None]), dim=0)  # (t+1, B)
 
-        assert P.size() == (T, B, k+1)
+        assert logPA.size() == (T, B)
+        assert entP.size() == (T, B)
         assert A.size() == (T, B)
 
         # calculate count
         terminal_action = (A == k)  # (T, B)  # true for the timestep when terminal action was selected.
         _, count = terminal_action.max(dim=0)  # (B,)  # index of the terminal action is considered the count
 
-        return P, A, count
+        return logPA, entP, A, count
 
     def compute_vars(self, v_emb, b, q):
         # v_emb = (B, k, v_dim)
@@ -353,17 +360,17 @@ class IRLC(nn.Module):
 
         batch_eps = torch.cat([self.eps] * B * num_mc_samples)[:, None]  # (B * samples, 1)
 
-        P, A, count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps)
-        _, _, greedy_count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps, greedy=True)
+        logPA, entP, A, count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps)
+        _, _, _, greedy_count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps, greedy=True)
 
-        return count, greedy_count, P, A, rho
+        return count, greedy_count, logPA, entP, A, rho
 
-    def get_sc_loss(self, count_gt, count, greedy_count, P, A):
+    def get_sc_loss(self, count_gt, count, greedy_count, logPA, valid_A):
         # count_gt = (B,)
         # count = (B,)
         # greedy_count = (B,)
-        # P = (T, B, k+1)
-        # A = (T, B)
+        # logPA = (T, B)
+        # valid_A = (T, B)
 
         assert count.size() == count_gt.size()
         assert greedy_count.size() == count_gt.size()
@@ -372,93 +379,80 @@ class IRLC(nn.Module):
         greedy_count = greedy_count.float()
         count_gt = count_gt.float()
 
-        T, B, num_actions = P.size()
-
         # self-critical loss
         E = torch.abs(count - count_gt)  # (B,)
         E_greedy = torch.abs(greedy_count - count_gt)  # (B,)
 
         R = E_greedy - E  # (B,)
-        # R = self.EMA - E  # (B,)
 
-        # self.EMA = 0.99 * self.EMA + 0.01 * E.mean()
-
-        # R = - E  # (B,)
         assert R.size() == count.size(), "R size is {}".format(R.size())
 
-        terminal_A = (A == (num_actions-1)).float()  # (T, B)
-        post_terminal_A = terminal_A.cumsum(dim=0) - terminal_A  # (T, B)
-        valid_A = (A == A).float() - post_terminal_A  # (T, B)
-
-        # we need to select the probabilities of actions sampled
-        PA = P.gather(dim=2, index=A.unsqueeze(2)).squeeze(dim=2)  # (T, B)
-        assert PA.size() == A.size()
-
-        log_PA = torch.log(PA + 1e-20)  # (T, B)
-        # sum_log_PA = log_PA.sum(dim=0)  # (B,)
-
-        mean_log_PA = (log_PA * valid_A).sum(dim=0) / valid_A.sum(dim=0)
+        mean_log_PA = (logPA * valid_A).sum(dim=0) / valid_A.sum(dim=0)  # (B,)
 
         batch_sc_loss = - R * mean_log_PA  # (B,)
         sc_loss = batch_sc_loss.mean(dim=0)  # (1,)
 
         return sc_loss
 
-    def get_entropy_loss(self, P, A):
-        # P = (T, B, k+1)
-        # A = (T, B)
+    def get_entropy_loss(self, entP, valid_A):
+        # entP = (T, B)
+        # valid_A = (T, B)
 
-        T, B, num_actions = P.size()
-
-        # P entropy loss
-        def H(probs, dim):
-            mults = probs * torch.log(probs + 1e-20)
-            return - mults.sum(dim=dim)
-
-        h = H(P, dim=2)  # (T, B)
-        terminal_A = (A == (num_actions - 1)).float()  # (T, B)
-        post_terminal_A = terminal_A.cumsum(dim=0) - terminal_A  # (T, B)
-        valid_A = (A == A).float() - post_terminal_A  # (T, B)
-
-        batch_entropy_loss = - (h * valid_A).sum(dim=0) / valid_A.sum(dim=0)  # (B,)
-
+        batch_entropy_loss = - (entP * valid_A).sum(dim=0) / valid_A.sum(dim=0)  # (B,)
         entropy_loss = batch_entropy_loss.mean(dim=0)
 
         return entropy_loss
 
-    def get_interaction_strength(self, rho):
+    def get_interaction_strength(self, rho, A, pre_terminal_A):
         # rho = (B, k, k)
+        # A = (T, B)
 
         B, k, _ = rho.size()
+        T, B = A.size()
 
         # interaction strength, lower is better, sparse preferred.
-        interaction_strengths = F.smooth_l1_loss(rho, 0*rho.detach(), reduce=False)  # (B, k, k)
-        interaction_strengths = interaction_strengths.mean(dim=2)  # (B, k)
-        # TODO: not sure if to be done only for selected actions. doing for all now.
-        # selected_interactions = interactions[A]  # (T, B)
-        # # sum along the time dimension
-        batch_interaction_strength = interaction_strengths.sum(dim=1)  # (B,)
+        interactions = F.smooth_l1_loss(rho, 0*rho.detach(), reduce=False)  # (B, k, k)
+        interactions = interactions.mean(dim=2)  # (B, k)
 
-        batch_interaction_strength /= k
+        # add a dummy interaction for the terminal action, pad zeros (value doesn't matter as it will be masked anyways.
+        interactions = torch.cat((interactions, 0*interactions[:, :1]), dim=1)  # (B, k+1)
 
-        interaction_strength = batch_interaction_strength.mean(dim=0)
+        # for each timestep select the interaction corresponding to the performed action
+        repeated_interactions = interactions[None].repeat(T, 1, 1)  # (T, B, k)
+        action_interactions = repeated_interactions.gather(dim=2, index=A.unsqueeze(2)).squeeze(2)  # (T ,B)
+
+        # mask out interactions due to actions done after the terminal action
+        valid_interactions = (action_interactions * pre_terminal_A).sum(dim=0) / (1e-20 + pre_terminal_A.sum(dim=0))  # (B,)
+
+        interaction_strength = valid_interactions.mean(dim=0)
 
         return interaction_strength
 
-    def get_loss(self, count_gt, count, greedy_count, P, A, rho):
+    def get_loss(self, count_gt, count, greedy_count, logPA, entP, A, rho):
         # count_gt = (B,)
         # count = (B,)
         # greedy_count = (B,)
-        # P = (T, B, k+1)
+        # logPA = (T, B)
+        # entP = (T, B)
         # A = (T, B)
         # rho = (B, k, k)
 
         assert count.size() == count_gt.size()
         assert greedy_count.size() == count_gt.size()
 
-        sc_loss = self.get_sc_loss(count_gt, count, greedy_count, P, A)
-        entropy_loss = self.get_entropy_loss(P, A)
-        interaction_strength = self.get_interaction_strength(rho)
+        terminal_action = A.max()
+        assert terminal_action.item() == 36
+
+        terminal_A = (A == terminal_action).float()  # (T, B)
+        post_terminal_A = terminal_A.cumsum(dim=0) - terminal_A  # (T, B)
+        pre_terminal_A = 1 - post_terminal_A - terminal_A
+        valid_A = 1 - post_terminal_A  # (T, B)
+
+        sc_loss = self.get_sc_loss(count_gt, count, greedy_count, logPA, valid_A)
+        entropy_loss = self.get_entropy_loss(entP, valid_A)
+        interaction_strength = self.get_interaction_strength(rho, A, pre_terminal_A)
+
+        # print("sc_loss", sc_loss, "entropy loss", entropy_loss, "interaction strength", interaction_strength)
 
         loss = 1.0 * sc_loss + .005 * entropy_loss + .005 * interaction_strength
 
