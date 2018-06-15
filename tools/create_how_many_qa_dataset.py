@@ -200,17 +200,20 @@ def find_counts():
         if qid not in hmq_ids["train"]["vqa"]:
             continue
 
-        # we will traverse labels in decreasing order of their counts and scores
-        # and select the first label that fits our criteria
-        first = True
-        for _, score, label in sorted(zip(entry["counts"], entry["scores"], entry["labels"]), reverse=True):
+        gt_cands = []
+        max_occurence_count = 0
+
+        for occurence_count, score, label in zip(entry["counts"], entry["scores"], entry["labels"]):
             try:
                 count = int(label2ans[label])
                 assert count <= 20, "No {} is more (score: {})".format(count, score)
-                if not first:
-                    print("selecting {} with score {}".format(count, score))
-                if qid2count["train"]["vqa"].get(qid) is None:
-                    qid2count["train"]["vqa"][qid] = count
+
+                if occurence_count > max_occurence_count:
+                    max_occurence_count = occurence_count
+                    gt_cands = [count]
+                elif occurence_count == max_occurence_count:
+                    gt_cands.append(count)
+
                 if qid2count2score["train"]["vqa"].get(qid) is None:
                     qid2count2score["train"]["vqa"][qid] = [0] * 21  # count2score list mapping
                 qid2count2score["train"]["vqa"][qid][count] = score
@@ -219,7 +222,8 @@ def find_counts():
                 print(e)
                 pass
 
-            first = False
+        # select the answer with highest occurence count, in case of a tie select the minimum
+        qid2count["train"]["vqa"][qid] = min(gt_cands)
 
     hmqa_qids = json.load(open("./data/how_many_qa/HowMany-QA/question_ids.json", "rb"))
     hmqa_vg_qids = set(hmqa_qids["train"]["visual_genome"])
@@ -256,28 +260,27 @@ def find_counts():
         if test_entry and dev_entry:
             raise Exception("Found qid {} that is marked for both test set and train set!!".format(qid))
 
-        # we will traverse labels in decreasing order of their counts and scores
-        # and select the first label that fits our criteria
-        first = True
-        for _, score, label in sorted(zip(entry["counts"], entry["scores"], entry["labels"]), reverse=True):
+        gt_cands = []
+        max_occurence_count = 0
+
+        for occurence_count, score, label in zip(entry["counts"], entry["scores"], entry["labels"]):
             try:
                 count = int(label2ans[label])
                 assert count <= 20, "No {} is more (score: {})".format(count, score)
-                if not first:
-                    print("selecting {} with score {}".format(count, score))
+
+                if occurence_count > max_occurence_count:
+                    max_occurence_count = occurence_count
+                    gt_cands = [count]
+                elif occurence_count == max_occurence_count:
+                    gt_cands.append(count)
 
                 if test_entry:
-
-                    if qid2count["test"].get(qid) is None:
-                        qid2count["test"][qid] = count
 
                     if qid2count2score["test"].get(qid) is None:
                         qid2count2score["test"][qid] = [0] * 21  # count2score list mapping
                     qid2count2score["test"][qid][count] = score
 
                 if dev_entry:
-                    if qid2count["dev"].get(qid) is None:
-                        qid2count["dev"][qid] = count
 
                     if qid2count2score["dev"].get(qid) is None:
                         qid2count2score["dev"][qid] = [0] * 21  # count2score list mapping
@@ -287,7 +290,12 @@ def find_counts():
                 print(e)
                 pass
 
-            first = False
+        # select the answer with highest occurence count, in case of a tie select the minimum
+        if test_entry:
+            qid2count["test"][qid] = min(gt_cands)
+        if dev_entry:
+            assert not test_entry
+            qid2count["dev"][qid] = min(gt_cands)
 
     assert len(qid2count["train"]["vqa"]) == 47542
     assert len(qid2count["test"]) == 5000
