@@ -200,10 +200,10 @@ def find_counts():
         if qid not in hmq_ids["train"]["vqa"]:
             continue
 
-        # we will traverse labels in decreasing order of the scores
+        # we will traverse labels in decreasing order of their counts and scores
         # and select the first label that fits our criteria
         first = True
-        for score, label in sorted(zip(entry["scores"], entry["labels"]), reverse=True):
+        for _, score, label in sorted(zip(entry["counts"], entry["scores"], entry["labels"]), reverse=True):
             try:
                 count = int(label2ans[label])
                 assert count <= 20, "No {} is more (score: {})".format(count, score)
@@ -256,10 +256,10 @@ def find_counts():
         if test_entry and dev_entry:
             raise Exception("Found qid {} that is marked for both test set and train set!!".format(qid))
 
-        # we will traverse labels in decreasing order of the scores
+        # we will traverse labels in decreasing order of their counts and scores
         # and select the first label that fits our criteria
         first = True
-        for score, label in sorted(zip(entry["scores"], entry["labels"]), reverse=True):
+        for _, score, label in sorted(zip(entry["counts"], entry["scores"], entry["labels"]), reverse=True):
             try:
                 count = int(label2ans[label])
                 assert count <= 20, "No {} is more (score: {})".format(count, score)
@@ -293,8 +293,8 @@ def find_counts():
     assert len(qid2count["test"]) == 5000
     assert len(qid2count["dev"]) == 17714
 
-    json.dump(qid2count, open(qid2count_loc, "wb"))
-    json.dump(qid2count2score, open(qid2count2score_loc, "wb"))
+    json.dump(qid2count, open(qid2count_loc, "w"))
+    json.dump(qid2count2score, open(qid2count2score_loc, "w"))
     return
 
 

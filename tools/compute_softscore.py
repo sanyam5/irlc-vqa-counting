@@ -8,7 +8,15 @@ import cPickle
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dataset import Dictionary
-import utils
+
+
+def utils_create_dir(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
 
 
 contractions = {
@@ -166,7 +174,7 @@ def create_ans2label(occurence, name, cache_root='data/cache'):
         ans2label[answer] = label
         label += 1
 
-    utils.create_dir(cache_root)
+    utils_create_dir(cache_root)
 
     cache_file = os.path.join(cache_root, name+'_ans2label.pkl')
     cPickle.dump(ans2label, open(cache_file, 'wb'))
@@ -192,21 +200,25 @@ def compute_target(answers_dset, ans2label, name, cache_root='data/cache'):
 
         labels = []
         scores = []
+        counts = []
         for answer in answer_count:
             if answer not in ans2label:
                 continue
             labels.append(ans2label[answer])
-            score = get_score(answer_count[answer])
+            count = answer_count[answer]
+            counts.append(count)
+            score = get_score(count)
             scores.append(score)
 
         target.append({
             'question_id': ans_entry['question_id'],
             'image_id': ans_entry['image_id'],
             'labels': labels,
-            'scores': scores
+            'scores': scores,
+            'counts': counts
         })
 
-    utils.create_dir(cache_root)
+    utils_create_dir(cache_root)
     cache_file = os.path.join(cache_root, name+'_target.pkl')
     cPickle.dump(target, open(cache_file, 'wb'))
     return target
