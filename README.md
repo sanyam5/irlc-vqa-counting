@@ -2,7 +2,7 @@
 Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.org/pdf/1712.08697.pdf)** for ICLR 2018 reproducibility challenge.
 
 
-## Results
+## Results (without caption grounding)
 
 | Model | Test Accuracy | Test RMSE | Training Time
 | --- | --- | -- | -- |
