@@ -81,9 +81,9 @@ Pred: 4
 IRLC assigns different probabilities to each candidate. Dark blue boxes is more probable, faint blue is less probable. IRLC then picks most probable ones first. The picked up objects are show in bright red boxes.
 
 <pre> timestep=0                                              timestep=1 </pre>
-<img src="vis/00-selection_image-335.png" width="400">  <img src="01-selection_image-335.png" width="400">
+<img src="vis/00-selection_image-335.png" width="400">  <img src="vis/01-selection_image-335.png" width="400">
 <pre> timestep=2                                              timestep=3 </pre>
-<img src="vis/02-selection_image-335.png" width="400">  <img src="03-selection_image-335.png" width="400">
+<img src="vis/02-selection_image-335.png" width="400">  <img src="vis/03-selection_image-335.png" width="400">
 <pre> timestep=4   </pre>
 <img src="vis/04-selection_image-335.png" width="400">  
 
