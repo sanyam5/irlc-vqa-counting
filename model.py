@@ -301,6 +301,7 @@ class IRLC(nn.Module):
 
         B, k = kappa_0.size()
 
+        P = None  # save un-scaled probabilities of each action at each time-step. mainly for visualization
         logPA = None  # log prob values for each time-step.
         entP = None  # distribution entropy value for each timestep.
         A = None  # will store action values at each timestep.
@@ -319,6 +320,7 @@ class IRLC(nn.Module):
             kappa = kappa + interaction
 
             # record the prob and action values at each timestep for later use
+            P = unscaled_p[None] if P is None else torch.cat((P, unscaled_p[None]), dim=0)  # (t+1, B, k+1)
             logPA = log_prob[None] if logPA is None else torch.cat((logPA, log_prob[None]), dim=0)  # (t+1, B)
             entP = entropy[None] if entP is None else torch.cat((entP, log_prob[None]), dim=0)  # (t+1, B)
             A = a[None] if A is None else torch.cat((A, a[None]), dim=0)  # (t+1, B)
@@ -331,7 +333,7 @@ class IRLC(nn.Module):
         terminal_action = (A == k)  # (T, B)  # true for the timestep when terminal action was selected.
         _, count = terminal_action.max(dim=0)  # (B,)  # index of the terminal action is considered the count
 
-        return logPA, entP, A, count
+        return logPA, entP, A, count, P
 
     def compute_vars(self, v_emb, b, q):
         # v_emb = (B, k, v_dim)
@@ -360,10 +362,10 @@ class IRLC(nn.Module):
 
         batch_eps = torch.cat([self.eps] * B * num_mc_samples)[:, None]  # (B * samples, 1)
 
-        logPA, entP, A, count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps)
-        _, _, _, greedy_count = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps, greedy=True)
+        logPA, entP, A, count, P = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps)
+        _, _, _, greedy_count, _ = self.sample_objects(kappa_0=kappa_0, rho=rho, batch_eps=batch_eps, greedy=True)
 
-        return count, greedy_count, logPA, entP, A, rho
+        return count, greedy_count, logPA, entP, A, rho, P
 
     def get_sc_loss(self, count_gt, count, greedy_count, logPA, valid_A):
         # count_gt = (B,)

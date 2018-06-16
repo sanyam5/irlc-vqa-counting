@@ -1,12 +1,10 @@
 from __future__ import print_function
-import os
 import json
 try:
     import _pickle as pkl
 except:
     import cPickle as pkl
 import numpy as np
-import h5py
 import torch
 from torch.utils.data import Dataset
 
