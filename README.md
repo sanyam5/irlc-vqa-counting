@@ -46,6 +46,9 @@ From Table 1 in the paper, it would seem that adding the extra data from Visual 
 
 - No real hyper-parameter search was performed. We use the same learning rate, learning rate schedule, loss weighing coefficients. The authors didn't mention the amount of dropout they used. After trying a few values the value 0.3 was chosen.
 
+- The value for number of samples was kept to 32 (instead of 5 as mentioned in the paper). The value 32 was chosen because it was the maximum value for which the training time did not suffer significantly.
+
+- All other parameters were kept same. Optimizer, learning rate, learning schedule, etc. are exactly the same as mentioned in the paper.
 
 ## Usage
 #### Prerequisites
