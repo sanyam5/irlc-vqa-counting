@@ -13,15 +13,15 @@ Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.
 
 The accuracy was calculated using the [VQA evaluation metric](http://www.visualqa.org/evaluation.html).
 
-RMSE = root mean sqared error from the ground truth.
+RMSE = root mean squared error from the ground truth.
 
 
 ## Key differences from the paper
 - GRU was used instead of LSTM for generating question embeddings. Experiments with LSTM led to slower learning and more over-fitting. More hyper-parameter search is required to fix this.
 
-- The hidden size of this implementation's scoring function is 1024 compared to their 2048. Using size larger than 1024 led to an over-fitting behaviour. More hyper-parameter search is required to find the right amount of regularization. This can lead to significant improvements in accuracy.
+- The hidden size of this implementation's scoring function is 1024 compared to their 2048. Using size larger than 1024 led to an over-fitting behavior. More hyper-parameter search is required to find the right amount of regularization. This can lead to significant improvements in accuracy.
 
-- Gated Tanh Unit is not used. Instead a 2-layer Leaky ReLu based network inspired by https://github.com/hengyuan-hu/bottom-up-attention-vqa with slight modifications is used.
+- Gated Tanh Unit is not used. Instead, a 2-layer Leaky ReLu based network inspired by https://github.com/hengyuan-hu/bottom-up-attention-vqa with slight modifications is used.
 
 
 ## Filling in missing details in the paper
@@ -35,10 +35,10 @@ The authors mentioned that they use early stopping based on the development set 
 #### Number of candidate objects
 I could not find the value of N = number of candidate objects that are taken from Faster-R-CNN so following https://github.com/hengyuan-hu/bottom-up-attention-vqa I took N=36. 
 
-## Minor descrepancies
+## Minor discrepancies
 
 #### Number of images due to Visual Genome
-From Table 1 in the paper it would seem that adding the extra data from Visual Genome doesn't change the number of training images (31932). However while writing the dataloaders for Visual Genome I noticed a around 45k images after including the visual genome dataset. This is not really a big issue, but I still thought I'd write it so that other people can avoid wasting their time investigating it.
+From Table 1 in the paper, it would seem that adding the extra data from Visual Genome doesn't change the number of training images (31932). However, while writing the dataloaders for Visual Genome I noticed around 45k images after including the visual genome dataset. This is not really a big issue, but I still thought I'd write it so that other people can avoid wasting their time investigating it.
 
 ## Implementation Details
 
@@ -49,7 +49,7 @@ From Table 1 in the paper it would seem that adding the extra data from Visual G
 
 ## Usage
 #### Prerequisites
-Make sure you are on a machine with a NVIDIA GPU and Python 3 with about 100 GB disk space. Python 2 might be required for running some scripts in ./tools (will try to fix this soon)
+Make sure you are on a machine with an NVIDIA GPU and Python 3 with about 100 GB disk space. Python 2 might be required for running some scripts in ./tools (will try to fix this soon)
 
 #### Installation
 - Install PyTorch v0.4 with CUDA and Python 3.5.
