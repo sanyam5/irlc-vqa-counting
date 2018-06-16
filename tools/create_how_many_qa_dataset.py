@@ -3,16 +3,17 @@ import json
 import cPickle as pkl
 import os
 import re
-import numpy as np
-import h5py
 
 
 def find_image_ids():
 
+    # read locations
     train_targets_loc = "./data/cache/train_target.pkl"
     val_targets_loc = "./data/cache/val_target.pkl"
-    hmq_image_ids_loc = "./data/how_many_qa/image_ids.json"
+    hmq_ids_loc = "./data/how_many_qa/HowMany-QA/question_ids.json"
 
+    # write locations
+    hmq_image_ids_loc = "./data/how_many_qa/image_ids.json"
     if os.path.isfile(hmq_image_ids_loc):
         print("The file {} already exists. Skipping finding image ids.".format(hmq_image_ids_loc))
         return
@@ -20,7 +21,7 @@ def find_image_ids():
     train_targets = pkl.load(open(train_targets_loc, "rb"))
     val_targets = pkl.load(open(val_targets_loc, "rb"))
 
-    hmq_ids = json.load(open("./data/how_many_qa/HowMany-QA/question_ids.json", "rb"))
+    hmq_ids = json.load(open(hmq_ids_loc, "rb"))
     qids = {
         "train": set(hmq_ids["train"]["vqa"]),
         "test": set(hmq_ids["test"]),
@@ -71,10 +72,21 @@ def find_image_ids():
 
 def prepare_visual_genome():
 
-    hmqa_qids = json.load(open("./data/how_many_qa/HowMany-QA/question_ids.json", "rb"))
+    # read locations
+    hmqa_qids_loc = "./data/how_many_qa/HowMany-QA/question_ids.json"
+    all_vg_loc = "./data/how_many_qa/HowMany-QA/visual_genome_question_answers.json"
+    vg_image_data_loc = "./data/how_many_qa/HowMany-QA/visual_genome_image_data.json"
+
+    # write locations
+    vgn_ques_loc = "./data/how_many_qa/vgn_ques.json"
+    if os.path.isfile(vgn_ques_loc):
+        print("The file {} already exists. Skipping preparing visual genome.".format(vgn_ques_loc))
+        return
+
+    hmqa_qids = json.load(open(hmqa_qids_loc, "rb"))
     hmqa_vg_qids = set(hmqa_qids["train"]["visual_genome"])
-    all_vg = json.load(open("./data/how_many_qa/HowMany-QA/visual_genome_question_answers.json"))
-    vg_image_data = json.load(open("./data/how_many_qa/HowMany-QA/visual_genome_image_data.json"))
+    all_vg = json.load(open(all_vg_loc))
+    vg_image_data = json.load(open(vg_image_data_loc))
 
     vg_entries = []
 
@@ -91,7 +103,7 @@ def prepare_visual_genome():
          } for x in vg_entries
     ]
 
-    json.dump(vgn_ques, open("./data/how_many_qa/vgn_ques.json", "wb"))
+    json.dump(vgn_ques, open(vgn_ques_loc, "wb"))
 
 
 def vg_ans2count(s):
@@ -154,6 +166,14 @@ def vg_ans2count(s):
 
 def find_counts():
 
+    # read locations
+    _hmq_ids_loc = "./data/how_many_qa/HowMany-QA/question_ids.json"
+    vqa_train_entries_loc = "./data/cache/train_target.pkl"
+    test_dev_entries_loc = "./data/cache/val_target.pkl"
+    label2ans_loc = "./data/cache/trainval_label2ans.pkl"
+    all_vg_loc = "./data/how_many_qa/HowMany-QA/visual_genome_question_answers.json"
+
+    # write locations
     qid2count_loc = "./data/how_many_qa/qid2count.json"
     qid2count2score_loc = "./data/how_many_qa/qid2count2score.json"
 
@@ -161,7 +181,7 @@ def find_counts():
         print("The file {} and {} already exists. Skipping finding counts.".format(qid2count_loc, qid2count2score_loc))
         return
 
-    _hmq_ids = json.load(open("./data/how_many_qa/HowMany-QA/question_ids.json", "rb"))
+    _hmq_ids = json.load(open(_hmq_ids_loc, "rb"))
     hmq_ids = {
         "train": {
             "vqa": set(_hmq_ids["train"]["vqa"]),
@@ -171,9 +191,9 @@ def find_counts():
         "dev": set(_hmq_ids["dev"]),
     }
 
-    vqa_train_entries = pkl.load(open("./data/cache/train_target.pkl", "rb"))
-    test_dev_entries = pkl.load(open("./data/cache/val_target.pkl", "rb"))
-    label2ans = pkl.load(open("./data/cache/trainval_label2ans.pkl", "rb"))
+    vqa_train_entries = pkl.load(open(vqa_train_entries_loc, "rb"))
+    test_dev_entries = pkl.load(open(test_dev_entries_loc, "rb"))
+    label2ans = pkl.load(open(label2ans_loc, "rb"))
 
     qid2count = {
         "train": {
@@ -225,9 +245,11 @@ def find_counts():
         # select the answer with highest occurence count, in case of a tie select the minimum
         qid2count["train"]["vqa"][qid] = min(gt_cands)
 
-    hmqa_qids = json.load(open("./data/how_many_qa/HowMany-QA/question_ids.json", "rb"))
+    ##### VISUAL GENOME  #######
+
+    hmqa_qids = json.load(open(_hmq_ids_loc, "rb"))
     hmqa_vg_qids = set(hmqa_qids["train"]["visual_genome"])
-    all_vg = json.load(open("./data/how_many_qa/HowMany-QA/visual_genome_question_answers.json"))
+    all_vg = json.load(open(all_vg_loc))
 
     vg_entries = []
 
@@ -246,6 +268,8 @@ def find_counts():
         qid2count["train"]["visual_genome"][qid] = count
         qid2count2score["train"]["visual_genome"][qid] = [0] * 21
         qid2count2score["train"]["visual_genome"][qid][count] = 1
+
+    ##################################
 
     # test and dev
     for entry in test_dev_entries:
@@ -305,4 +329,13 @@ def find_counts():
     json.dump(qid2count2score, open(qid2count2score_loc, "w"))
     return
 
+
+def main():
+    find_image_ids()
+    prepare_visual_genome()
+    find_counts()
+
+
+if __name__ == '__main__':
+    main()
 

@@ -31,7 +31,3 @@ unzip data/v2_Annotations_Val_mscoco.zip -d data
 wget -P data https://imagecaption.blob.core.windows.net/imagecaption/trainval_36.zip
 unzip data/trainval_36.zip -d data
 # rm data/trainval_36.zip
-
-# HowManQA
-wget -P data  https://einstein.ai/research/interpretable-counting-for-visual-question-answering/HowMany-QA.zip
-unzip data/HowMany-QA.zip -d data/how_many_qa
