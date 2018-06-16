@@ -63,6 +63,29 @@ The easiest way to download the data is to run the provided scripts `tools/downl
 #### Training
 Simply execute the cells in the IPython notebook `Training IRLC.ipynb` to start training. The development and testing scores will be printed every epoch. The model is saved every 10 epochs under the `saved_models` directory.
 
+#### Visualization
+Simply follow the `Visualize IRLC.ipynb` notebook. For this you will need to download MS-COCO images.
+
+Here are sample visualizations:
+
+Ques: How many sheepskin are grazing?
+
+Ans: 4
+
+Pred: 4
+
+<pre> Original Image                                        Candidates Objects in image </pre>
+
+<img src="vis/orig_image-335.png" width="400">  <img src="vis/image_candidates-335.png" width="400">
+
+IRLC assigns different probabilities to each candidate. Dark blue boxes is more probable, faint blue is less probable. IRLC then picks most probable ones first. The picked up objects are show in bright red boxes.
+
+<pre> timestep=0                                              timestep=1 </pre>
+<img src="vis/00-selection_image-335.png" width="400">  <img src="01-selection_image-335.png" width="400">
+<pre> timestep=2                                              timestep=3 </pre>
+<img src="vis/02-selection_image-335.png" width="400">  <img src="03-selection_image-335.png" width="400">
+<pre> timestep=4   </pre>
+<img src="vis/04-selection_image-335.png" width="400">  
 
 ## Acknowledgements
 The repository https://github.com/hengyuan-hu/bottom-up-attention-vqa was a huge help. It would have taken me a week at the least to write all code for pre-processing the data myself. A big thanks to the authors of this repository!
