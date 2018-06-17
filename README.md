@@ -6,14 +6,16 @@ Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.
 
 | Model | Test Accuracy | Test RMSE | Training Time
 | --- | --- | -- | -- |
-| Reported Model | **56.1** | 2.45 | Unknown |
-| Implemented Model | 54.4* | **2.40** | ~6 hours (Nvidia-1080 Ti) |
+| Reported | **56.1** | 2.45 | Unknown |
+| This implementation | 54.4* | **2.40** | ~6 hours (Nvidia-1080 Ti) |
 
 *= Still improving. Work in Progress. 
 
-The accuracy was calculated using the [VQA evaluation metric](http://www.visualqa.org/evaluation.html).
+The **accuracy** was calculated using the [VQA evaluation metric](http://www.visualqa.org/evaluation.html).
 
-RMSE = root mean squared error from the ground truth.
+**RMSE** = root mean squared error from the ground truth (see below for how ground truth was chosen for VQA).
+
+**Note**: These numbers correspond to the test accuracy and RMSE when the accuracy on the development set was maximum. The peak test accuracy is usually higher by about a percent.
 
 
 ## Key differences from the paper
@@ -40,9 +42,11 @@ I could not find the value of N = number of candidate objects that are taken fro
 #### Number of images due to Visual Genome
 From Table 1 in the paper, it would seem that adding the extra data from Visual Genome doesn't change the number of training images (31932). However, while writing the dataloaders for Visual Genome I noticed around 45k images after including the visual genome dataset. This is not really a big issue, but I still thought I'd write it so that other people can avoid wasting their time investigating it.
 
-## Implementation Details
+## Other Implementation Details
 
 - This implementation borrows most of its pre-processing and data loading code from https://github.com/hengyuan-hu/bottom-up-attention-vqa
+
+- The optional "caption grounding" step was skipped since it only improved the accuracy by a percent or so and was not the main focus of the paper.
 
 - No real hyper-parameter search was performed. We use the same learning rate, learning rate schedule, loss weighing coefficients. The authors didn't mention the amount of dropout they used. After trying a few values the value 0.3 was chosen.
 
