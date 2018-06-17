@@ -12,7 +12,7 @@ I found the paper quite interesting. Since I could not find any publicly availab
 | Model | Test Accuracy | Test RMSE | Training Time
 | --- | --- | -- | -- |
 | Reported | **56.1** | 2.45 | Unknown |
-| This implementation | 54.4* | **2.40** | ~6 hours (Nvidia-1080 Ti) |
+| This implementation | 55.2* | **2.41** | ~6 hours (Nvidia-1080 Ti) |
 
 *= Still improving. Work in Progress. 
 
@@ -25,8 +25,6 @@ The **accuracy** was calculated using the [VQA evaluation metric](http://www.vis
 
 ## Key differences from the paper
 - GRU was used instead of LSTM for generating question embeddings. Experiments with LSTM led to slower learning and more over-fitting. More hyper-parameter search is required to fix this.
-
-- The hidden size of this implementation's scoring function is 1024 compared to their 2048. Using size larger than 1024 led to an over-fitting behavior. More hyper-parameter search is required to find the right amount of regularization. This can lead to significant improvements in accuracy.
 
 - Gated Tanh Unit is not used. Instead, a 2-layer Leaky ReLu based network inspired by https://github.com/hengyuan-hu/bottom-up-attention-vqa with slight modifications is used.
 
@@ -53,9 +51,9 @@ From Table 1 in the paper, it would seem that adding the extra data from Visual 
 
 - The optional "caption grounding" step was skipped since it only improved the accuracy by a percent or so and was not the main focus of the paper.
 
-- No real hyper-parameter search was performed. We use the same learning rate, learning rate schedule, loss weighing coefficients. The authors didn't mention the amount of dropout they used. After trying a few values the value 0.3 was chosen.
+- The authors didn't mention the amount of dropout they used. After trying a few values the value 0.4 was chosen.
 
-- The value for number of samples was kept to 32 (instead of 5 as mentioned in the paper). The value 32 was chosen because it was the maximum value for which the training time did not suffer significantly.
+- The value for number of samples was kept to 32 (instead of 5 as mentioned in the paper). The value 32 was chosen because it was the maximum value for which the training time did not suffer significantly. The effects of changing sample size on accuracy were not tested.
 
 - All other parameters were kept same. Optimizer, learning rate, learning schedule, etc. are exactly the same as mentioned in the paper.
 

@@ -244,7 +244,7 @@ class RhoScorer(nn.Module):
 
 class IRLC(nn.Module):
 
-    def __init__(self, ques_dim=1024, score_dim=1024, dropout=0.3):
+    def __init__(self, ques_dim=1024, score_dim=2048, dropout=0.4):
         super(IRLC, self).__init__()
         self.ques_parser = QuestionParser(ques_dim=ques_dim, dropout=dropout)
         self.f_s = ScoringFunction(ques_dim=ques_dim, score_dim=score_dim, dropout=dropout)
