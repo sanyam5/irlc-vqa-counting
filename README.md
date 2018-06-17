@@ -1,5 +1,10 @@
 # irlc-vqa
-Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.org/pdf/1712.08697.pdf)** for ICLR 2018 reproducibility challenge.
+Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.org/pdf/1712.08697.pdf)** for ICLR 2018 reproducibility challenge. 
+
+## About
+The paper improves upon the state-of-the art accuracy for counting based questions in VQA. They do it by enforcing the prior that each count corresponds to a well defined region in the image and is not diffused all over the image. They hard-attend over a fixed set of candiate regions (taken from a Faster-R-CNN network) in the image by fusing it with the information from the question. They use a variant of REINFORCE - Self Critical Training - which is well suited for generating sequences.
+
+I found the paper quite interesting. Since I could not find any publicly available implementation of this paper I decided to implement it as a self-excercise.
 
 
 ## Results (without caption grounding)
@@ -11,7 +16,7 @@ Code for **[Interpretable Counting for Visual Question Answering](https://arxiv.
 
 *= Still improving. Work in Progress. 
 
-The **accuracy** was calculated using the [VQA evaluation metric](http://www.visualqa.org/evaluation.html).
+The **accuracy** was calculated using the [VQA evaluation metric](http://www.visualqa.org/evaluation.html). I used the exact same script for calculating "soft score" as in https://github.com/hengyuan-hu/bottom-up-attention-vqa.
 
 **RMSE** = root mean squared error from the ground truth (see below for how ground truth was chosen for VQA).
 
@@ -93,6 +98,7 @@ IRLC assigns different probabilities to each candidate. Dark blue boxes is more 
 <img src="vis/02-selection_image-335.png" width="400">  <img src="vis/03-selection_image-335.png" width="400">
 <pre> timestep=4   </pre>
 <img src="vis/04-selection_image-335.png" width="400">  
+
 
 ## Acknowledgements
 The repository https://github.com/hengyuan-hu/bottom-up-attention-vqa was a huge help. It would have taken me a week at the least to write all code for pre-processing the data myself. A big thanks to the authors of this repository!
