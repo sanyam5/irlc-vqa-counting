@@ -10,15 +10,18 @@ from torch.distributions.categorical import Categorical
 
 
 class QuestionParser(nn.Module):
-    word_dim = 300
-    ques_dim = 1024
     glove_file = DATA_DIR + "/glove6b_init_300d.npy"
 
-    def __init__(self, dropout=0.3):
+    def __init__(self, dropout=0.3, word_dim=300, ques_dim=1024):
         super(QuestionParser, self).__init__()
+
+        self.dropout = dropout
+        self.word_dim = word_dim
+        self.ques_dim = ques_dim
+
         self.embd = nn.Embedding(VOCAB_SIZE + 1, self.word_dim, padding_idx=VOCAB_SIZE)
         self.rnn = nn.GRU(self.word_dim, self.ques_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.drop = nn.Dropout(self.dropout)
         self.glove_init()
 
     def glove_init(self):
@@ -35,7 +38,7 @@ class QuestionParser(nn.Module):
         questions = self.embd(questions)  # (MAXLEN, B, word_size)
         _, (q_emb) = self.rnn(questions)
         q_emb = q_emb[-1]  # (B, ques_size)
-        q_emb = self.dropout(q_emb)
+        q_emb = self.drop(q_emb)
 
         return q_emb
 
@@ -62,17 +65,20 @@ class FCNet(nn.Module):
 
 
 class ScoringFunction(nn.Module):
-    v_dim = 2048
-    q_dim = QuestionParser.ques_dim
-    score_dim = 1024
 
-    def __init__(self, dropout=0.3):
+    def __init__(self, ques_dim, dropout=0.3, v_dim=2048, score_dim=1024):
         super(ScoringFunction, self).__init__()
-        self.v_drop = nn.Dropout(dropout)
-        self.q_drop = nn.Dropout(dropout)
+
+        self.q_dim = ques_dim
+        self.dropout = dropout
+        self.v_dim = v_dim
+        self.score_dim = score_dim
+
+        self.v_drop = nn.Dropout(self.dropout)
+        self.q_drop = nn.Dropout(self.dropout)
         self.v_proj = FCNet([self.v_dim, self.score_dim])
         self.q_proj = FCNet([self.q_dim, self.score_dim])
-        self.dropout = nn.Dropout(dropout)
+        self.s_drop = nn.Dropout(self.dropout)
 
     def forward(self, v, q):
         """
@@ -85,23 +91,25 @@ class ScoringFunction(nn.Module):
         v_proj = self.v_proj(v)  # [batch, k, qdim]
         q_proj = self.q_proj(q).unsqueeze(1).repeat(1, k, 1)  # [batch, k, qdim]
         s = v_proj * q_proj
-        s = self.dropout(s)
+        s = self.s_drop(s)
         return s  # (B, k, score_dim)
 
 
 class GTUScoringFunction(nn.Module):
-    v_dim = 2048
-    q_dim = QuestionParser.ques_dim
-    score_dim = 2048
 
-    def __init__(self, dropout=0.3):
+    def __init__(self, ques_dim, dropout=0.3, v_dim=2048, score_dim=2048):
         super(GTUScoringFunction, self).__init__()
 
-        self.predrop = nn.Dropout(dropout)
+        self.q_dim = ques_dim
+        self.dropout = dropout
+        self.v_dim = v_dim
+        self.score_dim = score_dim
+
+        self.predrop = nn.Dropout(self.dropout)
         self.dense1 = weight_norm(nn.Linear(self.v_dim + self.q_dim, self.score_dim), dim=None)
         self.dense2 = weight_norm(nn.Linear(self.v_dim + self.q_dim, self.score_dim), dim=None)
 
-        self.dropout = nn.Dropout(dropout + 0.2)
+        self.s_drop = nn.Dropout(self.dropout)
 
     def forward(self, v, q):
         """
@@ -119,17 +127,17 @@ class GTUScoringFunction(nn.Module):
         g = F.sigmoid(self.dense2(vq))  # (B, k, score_dim)
 
         s = y * g
-        s = self.dropout(s)
+        s = self.s_drop(s)
         return s  # (B, k, score_dim)
 
 
 class SoftCount(nn.Module):
 
-    def __init__(self):
+    def __init__(self, ques_dim=1024, score_dim=512, dropout=0.1):
         super(SoftCount, self).__init__()
-        self.ques_parser = QuestionParser()
-        self.f = ScoringFunction()
-        self.W = weight_norm(nn.Linear(self.f.score_dim, 1), dim=None)
+        self.ques_parser = QuestionParser(ques_dim=ques_dim, dropout=dropout)
+        self.f = ScoringFunction(ques_dim=ques_dim, score_dim=score_dim, dropout=dropout)
+        self.W = weight_norm(nn.Linear(score_dim, 1), dim=None)
 
     def forward(self, v_emb, q):
         # v_emb = (B, k, v_dim)
@@ -144,9 +152,9 @@ class SoftCount(nn.Module):
 
 class RhoScorer(nn.Module):
 
-    def __init__(self):
+    def __init__(self, ques_dim):
         super(RhoScorer, self).__init__()
-        self.W = weight_norm(nn.Linear(QuestionParser.ques_dim, 1), dim=None)
+        self.W = weight_norm(nn.Linear(ques_dim, 1), dim=None)
 
         inp_dim = 1 + 1 + 6 + 6 + 1 + 1 + 1  # 17
         self.f_rho = FCNet([inp_dim, 100])
@@ -236,17 +244,16 @@ class RhoScorer(nn.Module):
 
 class IRLC(nn.Module):
 
-    def __init__(self):
+    def __init__(self, ques_dim=1024, score_dim=1024, dropout=0.3):
         super(IRLC, self).__init__()
-        self.ques_parser = QuestionParser()
-        self.f_s = ScoringFunction()
-        self.W = weight_norm(nn.Linear(self.f_s.score_dim, 1), dim=None)
-        self.f_rho = RhoScorer()
+        self.ques_parser = QuestionParser(ques_dim=ques_dim, dropout=dropout)
+        self.f_s = ScoringFunction(ques_dim=ques_dim, score_dim=score_dim, dropout=dropout)
+        self.W = weight_norm(nn.Linear(score_dim, 1), dim=None)
+        self.f_rho = RhoScorer(ques_dim=ques_dim)
 
         # extra custom parameters
         self.eps = nn.Parameter(torch.zeros(1))
         self.extra_params = nn.ParameterList([self.eps])
-        self.EMA = 0
 
     def sample_action(self, probs, already_selected=None, greedy=False):
         # probs = (B, k+1)
@@ -442,8 +449,10 @@ class IRLC(nn.Module):
         assert count.size() == count_gt.size()
         assert greedy_count.size() == count_gt.size()
 
+        B, k, _ = rho.size()
+
         terminal_action = A.max()
-        assert terminal_action.item() == 36
+        assert terminal_action.item() == k
 
         terminal_A = (A == terminal_action).float()  # (T, B)
         post_terminal_A = terminal_A.cumsum(dim=0) - terminal_A  # (T, B)
