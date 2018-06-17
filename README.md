@@ -9,6 +9,13 @@ I found the paper quite interesting. Since I could not find any publicly availab
 
 ## Results (without caption grounding)
 
+#### SoftCount
+| Model | Test Accuracy | Test RMSE | Training Time
+| --- | --- | -- | -- |
+| Reported | 49.2 | 2.45 | Unknown |
+| This implementation | **49.7** | **2.31** | ~12 minutes (Nvidia-1080 Ti) |
+
+#### IRLC
 | Model | Test Accuracy | Test RMSE | Training Time
 | --- | --- | -- | -- |
 | Reported | **56.1** | 2.45 | Unknown |
@@ -35,7 +42,7 @@ The **accuracy** was calculated using the [VQA evaluation metric](http://www.vis
 I couldn't find any annotations for a "single ground truth" which is requred to calculate the REINFORCE reward in IRLC. Also, I could not find any details in the paper relating to this issue. So I took as ground truth the label that was reported as the answer most number of times. In case there are more than one such label, the one having the least numerical value was picked (this might explain a lower RMSE).
 
 #### Number of epochs
-The authors mentioned that they use early stopping based on the development set accuracy but I couldn't find an exact method to determine when to stop. So I run the training for 100 epochs.
+The authors mentioned that they use early stopping based on the development set accuracy but I couldn't find an exact method to determine when to stop. So I run the training for 100 epochs for IRLC and 20 epochs for SoftCount.
 
 #### Number of candidate objects
 I could not find the value of N = number of candidate objects that are taken from Faster-R-CNN so following https://github.com/hengyuan-hu/bottom-up-attention-vqa I took N=36. 
