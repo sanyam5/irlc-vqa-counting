@@ -19,7 +19,7 @@ I found the paper quite interesting. Since I could not find any publicly availab
 | Model | Test Accuracy | Test RMSE | Training Time
 | --- | --- | -- | -- |
 | Reported | **56.1** | 2.45 | Unknown |
-| This implementation | 55.2* | **2.41** | ~6 hours (Nvidia-1080 Ti) |
+| This implementation | 55.7* | **2.41** | ~6 hours (Nvidia-1080 Ti) |
 
 *= Still improving. Work in Progress. 
 
@@ -58,7 +58,7 @@ From Table 1 in the paper, it would seem that adding the extra data from Visual 
 
 - The optional "caption grounding" step was skipped since it only improved the accuracy by a percent or so and was not the main focus of the paper.
 
-- The authors didn't mention the amount of dropout they used. After trying a few values the value 0.4 was chosen.
+- The authors didn't mention the amount of dropout they used. After trying a few values the value 0.5 was chosen.
 
 - The value for number of samples was kept to 32 (instead of 5 as mentioned in the paper). The value 32 was chosen because it was the maximum value for which the training time did not suffer significantly. The effects of changing sample size on accuracy were not tested.
 
