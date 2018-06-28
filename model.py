@@ -244,9 +244,11 @@ class RhoScorer(nn.Module):
 
 class IRLC(nn.Module):
 
-    def __init__(self, ques_dim=1024, score_dim=2048, dropout=0.4):
+    def __init__(self, ques_dim=1024, score_dim=2048, dropout=0.5):
         super(IRLC, self).__init__()
-        self.ques_parser = QuestionParser(ques_dim=ques_dim, dropout=dropout)
+        # print("question parser has zero dropout")
+        # put zero dropout for question, because it will get dropped out in scoring anyways.
+        self.ques_parser = QuestionParser(ques_dim=ques_dim, dropout=0)
         self.f_s = ScoringFunction(ques_dim=ques_dim, score_dim=score_dim, dropout=dropout)
         self.W = weight_norm(nn.Linear(score_dim, 1), dim=None)
         self.f_rho = RhoScorer(ques_dim=ques_dim)
